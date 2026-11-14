@@ -16,7 +16,9 @@
   } else if (typeof module === "object" && module.exports) {
     module.exports = factory();
   } else {
-    root.ArcadeVerse = factory();
+    var instance = factory();
+    root.ArcadeVerse = instance;
+    root.arcadeverse = instance;
   }
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
@@ -748,7 +750,7 @@
 
   init();
 
-  return {
+  var sdkInstance = {
     version: "1.1.0",
 
     /**
@@ -1437,6 +1439,605 @@
         logicalWidth: w,
         logicalHeight: h
       };
+    },
+
+    // ========================================================
+    // ARCADEVERSE CAMERA & VIEWPORT SUBSYSTEM
+    // Handles 0.5x to 2.0x zoom, middle-click/drag-to-pan,
+    // smooth matrix transformations, zero coordinate drift,
+    // on-screen reset HUD, and screen-to-world projection
+    // ========================================================
+    camera: {
+      /**
+       * Enables interactive zoom & pan on an HTML5 Canvas with smooth matrix transformations.
+       * @param {HTMLCanvasElement|string} canvas - Canvas element or selector
+       * @param {Object} [options]
+       * @param {number} [options.minZoom=0.5] Minimum scale factor
+       * @param {number} [options.maxZoom=2.0] Maximum scale factor
+       * @param {number} [options.zoomStep=0.1] Zoom step increment per mouse wheel tick
+       * @param {boolean} [options.showResetButton=true] Whether to show floating reset HUD
+       * @param {boolean} [options.dragToPan=false] Whether left-click dragging also pans without modifier
+       * @param {HTMLElement} [options.container] Parent container for the reset HUD
+       * @returns {Object} Camera controller instance
+       */
+      enableZoomPan: function (canvas, options) {
+        if (typeof canvas === 'string' && typeof document !== 'undefined') {
+          canvas = document.getElementById(canvas) || document.querySelector(canvas);
+        }
+        if (!canvas) {
+          console.warn('[ArcadeVerse.camera] enableZoomPan called with invalid canvas');
+          return null;
+        }
+
+        options = options || {};
+        var minZoom = typeof options.minZoom === 'number' ? Math.max(0.1, options.minZoom) : 0.5;
+        var maxZoom = typeof options.maxZoom === 'number' ? Math.min(10.0, options.maxZoom) : 2.0;
+        var zoomStep = typeof options.zoomStep === 'number' ? options.zoomStep : 0.1;
+        var showResetButton = options.showResetButton !== false;
+        var dragToPan = !!options.dragToPan;
+
+        var zoom = 1.0;
+        var panX = 0;
+        var panY = 0;
+
+        var isDragging = false;
+        var dragStartX = 0;
+        var dragStartY = 0;
+        var initialPanX = 0;
+        var initialPanY = 0;
+        var hasMovedBeyondThreshold = false;
+        var DRAG_THRESHOLD = 4; // px threshold to avoid accidental pan drift on normal clicks
+        var isSpacePressed = false;
+        var changeListeners = [];
+
+        // Save original styles
+        var origTransform = canvas.style.transform || '';
+        var origTransformOrigin = canvas.style.transformOrigin || '';
+        var origTransition = canvas.style.transition || '';
+
+        canvas.style.transformOrigin = '0 0';
+
+        function updateTransform(withAnimation) {
+          if (zoom < minZoom) zoom = minZoom;
+          if (zoom > maxZoom) zoom = maxZoom;
+
+          zoom = Math.round(zoom * 10000) / 10000;
+          panX = Math.round(panX * 100) / 100;
+          panY = Math.round(panY * 100) / 100;
+
+          if (withAnimation) {
+            canvas.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0, 1)';
+            setTimeout(function () {
+              if (canvas) canvas.style.transition = origTransition || 'none';
+            }, 220);
+          } else {
+            canvas.style.transition = 'none';
+          }
+
+          canvas.style.transform = 'matrix(' + zoom + ', 0, 0, ' + zoom + ', ' + panX + ', ' + panY + ')';
+
+          updateHud();
+
+          for (var i = 0; i < changeListeners.length; i++) {
+            try {
+              changeListeners[i]({
+                zoom: zoom,
+                panX: panX,
+                panY: panY,
+                matrix: [zoom, 0, 0, zoom, panX, panY]
+              });
+            } catch (_) {}
+          }
+        }
+
+        /**
+         * Projects screen or client coordinates to in-game canvas/world coordinates
+         * Accurate at any zoom level with zero drift
+         * @param {number|MouseEvent|TouchEvent} clientX - Client X coordinate or event
+         * @param {number} [clientY] - Client Y coordinate
+         * @returns {{ x: number, y: number, bufferX: number, bufferY: number }}
+         */
+        function screenToWorld(clientX, clientY) {
+          if (clientX && typeof clientX === 'object') {
+            var evt = clientX;
+            clientX = typeof evt.clientX === 'number' ? evt.clientX : (evt.touches && evt.touches[0] ? evt.touches[0].clientX : 0);
+            clientY = typeof evt.clientY === 'number' ? evt.clientY : (evt.touches && evt.touches[0] ? evt.touches[0].clientY : 0);
+          }
+
+          var rect = canvas.getBoundingClientRect();
+          var cssWidth = canvas.clientWidth || (rect.width > 0 ? rect.width / (zoom || 1) : canvas.width || 800);
+          var cssHeight = canvas.clientHeight || (rect.height > 0 ? rect.height / (zoom || 1) : canvas.height || 600);
+
+          var scaleX = rect.width > 0 ? (cssWidth / (rect.width / zoom)) : 1;
+          var scaleY = rect.height > 0 ? (cssHeight / (rect.height / zoom)) : 1;
+
+          var worldX = ((clientX - rect.left) / zoom) * scaleX;
+          var worldY = ((clientY - rect.top) / zoom) * scaleY;
+
+          var bufScaleX = canvas.width && cssWidth > 0 ? (canvas.width / cssWidth) : 1;
+          var bufScaleY = canvas.height && cssHeight > 0 ? (canvas.height / cssHeight) : 1;
+
+          return {
+            x: Math.round(worldX * 100) / 100,
+            y: Math.round(worldY * 100) / 100,
+            bufferX: Math.round(worldX * bufScaleX * 100) / 100,
+            bufferY: Math.round(worldY * bufScaleY * 100) / 100
+          };
+        }
+
+        /**
+         * Projects in-game world coordinates to screen/client coordinates
+         * @param {number} worldX
+         * @param {number} worldY
+         * @returns {{ x: number, y: number }}
+         */
+        function worldToScreen(worldX, worldY) {
+          var rect = canvas.getBoundingClientRect();
+          var cssWidth = canvas.clientWidth || (rect.width > 0 ? rect.width / (zoom || 1) : canvas.width || 800);
+          var cssHeight = canvas.clientHeight || (rect.height > 0 ? rect.height / (zoom || 1) : canvas.height || 600);
+
+          var scaleX = rect.width > 0 ? (cssWidth / (rect.width / zoom)) : 1;
+          var scaleY = rect.height > 0 ? (cssHeight / (rect.height / zoom)) : 1;
+
+          var screenX = rect.left + (worldX / scaleX) * zoom;
+          var screenY = rect.top + (worldY / scaleY) * zoom;
+
+          return {
+            x: Math.round(screenX * 100) / 100,
+            y: Math.round(screenY * 100) / 100
+          };
+        }
+
+        // Attach coordinate helpers to canvas directly for convenient access
+        canvas.screenToWorld = screenToWorld;
+        canvas.worldToScreen = worldToScreen;
+
+        // Augment pointer events with accurate worldX and worldY coordinates
+        function augmentPointerEvent(e) {
+          if (!e) return;
+          try {
+            var coords = screenToWorld(e.clientX, e.clientY);
+            e.worldX = coords.x;
+            e.worldY = coords.y;
+            e.bufferWorldX = coords.bufferX;
+            e.bufferWorldY = coords.bufferY;
+          } catch (_) {}
+        }
+
+        // Mouse Wheel Scaling (0.5x to 2.0x) around cursor focal point
+        function handleWheel(e) {
+          e.preventDefault();
+
+          var delta = -e.deltaY;
+          var factor = delta > 0 ? (1 + zoomStep) : (1 - zoomStep);
+          var newZoom = zoom * factor;
+          if (newZoom < minZoom) newZoom = minZoom;
+          if (newZoom > maxZoom) newZoom = maxZoom;
+
+          if (Math.abs(newZoom - zoom) < 0.001) return;
+
+          var rect = canvas.getBoundingClientRect();
+          var cursorX = e.clientX - rect.left;
+          var cursorY = e.clientY - rect.top;
+
+          var worldX = cursorX / zoom;
+          var worldY = cursorY / zoom;
+
+          panX = panX + cursorX - (worldX * newZoom);
+          panY = panY + cursorY - (worldY * newZoom);
+          zoom = newZoom;
+
+          updateTransform(false);
+        }
+
+        // Middle-click or Drag-to-Pan Handling
+        function handlePointerDown(e) {
+          augmentPointerEvent(e);
+
+          var isMiddleClick = (e.button === 1);
+          var isModifierDrag = (e.button === 0 && (e.altKey || e.shiftKey || isSpacePressed || dragToPan));
+
+          if (isMiddleClick || isModifierDrag) {
+            isDragging = true;
+            hasMovedBeyondThreshold = false;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            initialPanX = panX;
+            initialPanY = panY;
+
+            if (isMiddleClick) {
+              e.preventDefault();
+            }
+
+            if (typeof canvas.setPointerCapture === 'function' && e.pointerId) {
+              try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+            }
+          }
+        }
+
+        function handlePointerMove(e) {
+          augmentPointerEvent(e);
+
+          if (!isDragging) return;
+
+          var dx = e.clientX - dragStartX;
+          var dy = e.clientY - dragStartY;
+
+          if (!hasMovedBeyondThreshold) {
+            if (Math.sqrt(dx * dx + dy * dy) >= DRAG_THRESHOLD) {
+              hasMovedBeyondThreshold = true;
+            }
+          }
+
+          if (hasMovedBeyondThreshold) {
+            panX = initialPanX + dx;
+            panY = initialPanY + dy;
+            updateTransform(false);
+          }
+        }
+
+        function handlePointerUp(e) {
+          augmentPointerEvent(e);
+
+          if (isDragging) {
+            if (hasMovedBeyondThreshold) {
+              var preventClick = function (ev) {
+                ev.stopPropagation();
+                ev.preventDefault();
+                window.removeEventListener('click', preventClick, true);
+              };
+              window.addEventListener('click', preventClick, true);
+              setTimeout(function () {
+                window.removeEventListener('click', preventClick, true);
+              }, 50);
+            }
+            isDragging = false;
+            hasMovedBeyondThreshold = false;
+          }
+        }
+
+        function handleKeyDown(e) {
+          if (e.code === 'Space' || e.key === ' ') {
+            isSpacePressed = true;
+          }
+        }
+
+        function handleKeyUp(e) {
+          if (e.code === 'Space' || e.key === ' ') {
+            isSpacePressed = false;
+          }
+        }
+
+        function handleAuxClick(e) {
+          if (e.button === 1) {
+            e.preventDefault();
+          }
+        }
+
+        // Bind canvas listeners
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointermove', handlePointerMove);
+        canvas.addEventListener('pointerup', handlePointerUp);
+        canvas.addEventListener('auxclick', handleAuxClick);
+        canvas.addEventListener('click', augmentPointerEvent, true);
+        if (typeof window !== 'undefined') {
+          window.addEventListener('keydown', handleKeyDown);
+          window.addEventListener('keyup', handleKeyUp);
+          window.addEventListener('pointerup', handlePointerUp);
+        }
+
+        // ========================================================
+        // ON-SCREEN ZOOM RESET & CONTROLS HUD
+        // ========================================================
+        var hudElement = null;
+        var zoomLabelElement = null;
+
+        function createHud() {
+          if (!showResetButton || typeof document === 'undefined') return;
+
+          var targetParent = options.container || canvas.parentElement || document.body;
+          if (targetParent && targetParent !== document.body) {
+            var computedStyle = window.getComputedStyle ? window.getComputedStyle(targetParent) : targetParent.style;
+            if (computedStyle && computedStyle.position === 'static') {
+              targetParent.style.position = 'relative';
+            }
+          }
+
+          var hud = document.createElement('div');
+          hud.className = 'av-camera-zoom-hud';
+          hud.setAttribute('role', 'region');
+          hud.setAttribute('aria-label', 'Camera Zoom Controls');
+          hud.style.cssText = [
+            'position: absolute',
+            'top: 14px',
+            'right: 14px',
+            'z-index: 9999',
+            'display: inline-flex',
+            'align-items: center',
+            'gap: 4px',
+            'padding: 4px 6px',
+            'background: rgba(15, 23, 42, 0.85)',
+            'backdrop-filter: blur(8px)',
+            '-webkit-backdrop-filter: blur(8px)',
+            'border: 1px solid rgba(255, 255, 255, 0.15)',
+            'border-radius: 8px',
+            'box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35)',
+            'user-select: none',
+            'pointer-events: auto',
+            'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          ].join(';');
+
+          var btnStyle = [
+            'background: rgba(255, 255, 255, 0.08)',
+            'color: #f1f5f9',
+            'border: 1px solid rgba(255, 255, 255, 0.12)',
+            'border-radius: 6px',
+            'padding: 3px 8px',
+            'font-size: 13px',
+            'font-weight: 600',
+            'line-height: 1.2',
+            'cursor: pointer',
+            'transition: background 0.15s, border-color 0.15s, transform 0.1s',
+            'outline: none'
+          ].join(';');
+
+          // Zoom Out Button (-)
+          var btnZoomOut = document.createElement('button');
+          btnZoomOut.type = 'button';
+          btnZoomOut.textContent = '−';
+          btnZoomOut.title = 'Zoom Out';
+          btnZoomOut.setAttribute('aria-label', 'Zoom Out');
+          btnZoomOut.style.cssText = btnStyle;
+          btnZoomOut.addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            controller.zoomOut();
+          });
+
+          // Zoom Label / Percentage Indicator
+          var zoomLabel = document.createElement('span');
+          zoomLabel.className = 'av-camera-zoom-label';
+          zoomLabel.textContent = '100%';
+          zoomLabel.style.cssText = [
+            'min-width: 44px',
+            'text-align: center',
+            'font-size: 12px',
+            'font-weight: 600',
+            'color: #38bdf8',
+            'padding: 0 4px',
+            'letter-spacing: 0.02em'
+          ].join(';');
+
+          // Zoom In Button (+)
+          var btnZoomIn = document.createElement('button');
+          btnZoomIn.type = 'button';
+          btnZoomIn.textContent = '+';
+          btnZoomIn.title = 'Zoom In';
+          btnZoomIn.setAttribute('aria-label', 'Zoom In');
+          btnZoomIn.style.cssText = btnStyle;
+          btnZoomIn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            controller.zoomIn();
+          });
+
+          // Zoom Reset Button (Reset)
+          var btnReset = document.createElement('button');
+          btnReset.type = 'button';
+          btnReset.className = 'av-camera-reset-btn';
+          btnReset.textContent = 'Reset';
+          btnReset.title = 'Reset Zoom & Pan (1.0x)';
+          btnReset.setAttribute('aria-label', 'Reset Zoom and Pan');
+          btnReset.style.cssText = btnStyle + '; background: rgba(56, 189, 248, 0.18); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;';
+          btnReset.addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            controller.reset(true);
+          });
+
+          hud.appendChild(btnZoomOut);
+          hud.appendChild(zoomLabel);
+          hud.appendChild(btnZoomIn);
+          hud.appendChild(btnReset);
+
+          targetParent.appendChild(hud);
+
+          hudElement = hud;
+          zoomLabelElement = zoomLabel;
+        }
+
+        function updateHud() {
+          if (zoomLabelElement) {
+            zoomLabelElement.textContent = Math.round(zoom * 100) + '%';
+          }
+        }
+
+        createHud();
+
+        // Initial transform
+        updateTransform(false);
+
+        var controller = {
+          get zoom() { return zoom; },
+          get panX() { return panX; },
+          get panY() { return panY; },
+          get minZoom() { return minZoom; },
+          get maxZoom() { return maxZoom; },
+
+          /**
+           * Resets zoom to 1.0x and pan to (0, 0)
+           * @param {boolean} [animate=true]
+           */
+          reset: function (animate) {
+            zoom = 1.0;
+            panX = 0;
+            panY = 0;
+            updateTransform(animate !== false);
+            return this;
+          },
+
+          /**
+           * Zooms in by one zoomStep
+           */
+          zoomIn: function () {
+            var rect = canvas.getBoundingClientRect();
+            var focalX = rect.left + rect.width / 2;
+            var focalY = rect.top + rect.height / 2;
+            return this.setZoom(zoom + zoomStep, focalX, focalY);
+          },
+
+          /**
+           * Zooms out by one zoomStep
+           */
+          zoomOut: function () {
+            var rect = canvas.getBoundingClientRect();
+            var focalX = rect.left + rect.width / 2;
+            var focalY = rect.top + rect.height / 2;
+            return this.setZoom(zoom - zoomStep, focalX, focalY);
+          },
+
+          /**
+           * Sets zoom factor (clamped between minZoom and maxZoom)
+           * @param {number} newZoom
+           * @param {number} [focalX] Screen clientX to zoom towards
+           * @param {number} [focalY] Screen clientY to zoom towards
+           */
+          setZoom: function (newZoom, focalX, focalY) {
+            if (typeof newZoom !== 'number' || isNaN(newZoom)) return this;
+            var targetZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+            if (Math.abs(targetZoom - zoom) < 0.001) return this;
+
+            var rect = canvas.getBoundingClientRect();
+            var fx = typeof focalX === 'number' ? focalX - rect.left : rect.width / 2;
+            var fy = typeof focalY === 'number' ? focalY - rect.top : rect.height / 2;
+
+            var worldX = fx / zoom;
+            var worldY = fy / zoom;
+
+            panX = panX + fx - (worldX * targetZoom);
+            panY = panY + fy - (worldY * targetZoom);
+            zoom = targetZoom;
+
+            updateTransform(false);
+            return this;
+          },
+
+          /**
+           * Sets pan coordinates
+           * @param {number} x
+           * @param {number} y
+           */
+          setPan: function (x, y) {
+            if (typeof x === 'number') panX = x;
+            if (typeof y === 'number') panY = y;
+            updateTransform(false);
+            return this;
+          },
+
+          /**
+           * Projects screen/client coordinates to world coordinates
+           */
+          screenToWorld: screenToWorld,
+
+          /**
+           * Projects world coordinates to screen/client coordinates
+           */
+          worldToScreen: worldToScreen,
+
+          /**
+           * Gets affine transformation matrix array [a, b, c, d, e, f]
+           */
+          getMatrix: function () {
+            return [zoom, 0, 0, zoom, panX, panY];
+          },
+
+          /**
+           * Gets transform description object
+           */
+          getTransform: function () {
+            return {
+              zoom: zoom,
+              panX: panX,
+              panY: panY,
+              matrix: [zoom, 0, 0, zoom, panX, panY]
+            };
+          },
+
+          /**
+           * Applies current camera matrix to a 2D rendering context
+           * @param {CanvasRenderingContext2D} ctx
+           */
+          applyTransform: function (ctx) {
+            if (ctx && typeof ctx.setTransform === 'function') {
+              ctx.setTransform(zoom, 0, 0, zoom, panX, panY);
+            }
+            return this;
+          },
+
+          /**
+           * Subscribe to camera transformation change events
+           * @param {Function} callback
+           */
+          onChange: function (callback) {
+            if (typeof callback === 'function') {
+              changeListeners.push(callback);
+            }
+            return this;
+          },
+
+          /**
+           * Destroys camera controller, removes listeners and reset HUD
+           */
+          destroy: function () {
+            canvas.removeEventListener('wheel', handleWheel);
+            canvas.removeEventListener('pointerdown', handlePointerDown);
+            canvas.removeEventListener('pointermove', handlePointerMove);
+            canvas.removeEventListener('pointerup', handlePointerUp);
+            canvas.removeEventListener('auxclick', handleAuxClick);
+            canvas.removeEventListener('click', augmentPointerEvent, true);
+            if (typeof window !== 'undefined') {
+              window.removeEventListener('keydown', handleKeyDown);
+              window.removeEventListener('keyup', handleKeyUp);
+              window.removeEventListener('pointerup', handlePointerUp);
+            }
+
+            if (hudElement && hudElement.parentNode) {
+              hudElement.parentNode.removeChild(hudElement);
+            }
+
+            canvas.style.transform = origTransform;
+            canvas.style.transformOrigin = origTransformOrigin;
+            canvas.style.transition = origTransition;
+
+            if (canvas.screenToWorld === screenToWorld) {
+              delete canvas.screenToWorld;
+            }
+            if (canvas.worldToScreen === worldToScreen) {
+              delete canvas.worldToScreen;
+            }
+          }
+        };
+
+        canvas.arcadeverseCamera = controller;
+        return controller;
+      }
+    },
+
+    /**
+     * Alias for camera.enableZoomPan
+     */
+    enableZoomPan: function (canvas, options) {
+      return this.camera.enableZoomPan(canvas, options);
     }
   };
+
+  if (typeof window !== "undefined") {
+    try {
+      window.ArcadeVerse = sdkInstance;
+      window.arcadeverse = sdkInstance;
+    } catch (_) {}
+  }
+
+  return sdkInstance;
 });
