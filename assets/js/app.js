@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalGameTitle = document.getElementById("modal-game-title");
   const modalGameBadge = document.getElementById("modal-game-badge");
   const modalGameAuthor = document.getElementById("modal-game-author");
-  const gameIframe = document.getElementById("game-iframe");
+  let gameIframe = document.getElementById("game-iframe");
   const fullscreenBtn = document.getElementById("fullscreen-btn");
   const newTabBtn = document.getElementById("new-tab-btn");
   const reloadBtn = document.getElementById("reload-btn");
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedView === "list" || savedView === "grid") {
       currentCatalogView = savedView;
     }
-  } catch (_) {}
+  } catch (_) { }
   let lastFocusedElement = null;
 
   // ========================================================
@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedBindings) {
       activeKeybindings = Object.assign({}, DEFAULT_KEYBINDINGS, JSON.parse(savedBindings));
     }
-  } catch (_) {}
+  } catch (_) { }
 
   function ensureControlsSettingsDOM() {
     let btn = document.getElementById("modal-controls-btn");
@@ -183,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         activeKeybindings = Object.assign({}, DEFAULT_KEYBINDINGS);
         try {
           localStorage.removeItem(KEYBINDINGS_STORAGE_KEY);
-        } catch (_) {}
+        } catch (_) { }
         cancelRebinding();
       });
     }
@@ -192,7 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
       saveControlsBtn.addEventListener("click", () => {
         try {
           localStorage.setItem(KEYBINDINGS_STORAGE_KEY, JSON.stringify(activeKeybindings));
-        } catch (_) {}
+        } catch (_) { }
         cancelRebinding();
         if (typeof controlsDialog.close === "function") controlsDialog.close();
         else controlsDialog.removeAttribute("open");
@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("keyup", (e) => translateAndDispatchRemappedKey(e, "keyup"), false);
   let activeGame = null;
   let modalPushedHistory = false;
-  let closeAutocomplete = () => {};
+  let closeAutocomplete = () => { };
 
   // History API State Synchronization & Deep-Linking Engine
   function syncURLState(push = false) {
@@ -542,9 +542,9 @@ document.addEventListener("DOMContentLoaded", () => {
             bytesFreed += (key.length + val.length) * 2;
             localStorage.removeItem(key);
             keysRemoved++;
-          } catch (_) {}
+          } catch (_) { }
         });
-      } catch (_) {}
+      } catch (_) { }
       return { bytesFreed, keysRemoved };
     }
 
@@ -623,7 +623,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ArcadeStorageResilience.safeSetItem(FAVORITES_STORAGE_KEY, legacy);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   function getFavorites() {
     try {
@@ -956,7 +956,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateFavoritesBadge();
 
   // Render Games
-  
+
   // --- Facet Filter Summary Indicator Engine ---
   function updateFacetSummaryUI() {
     const summaryContainer = document.getElementById("active-filters-summary");
@@ -1073,7 +1073,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  
+
   // Helper to identify Halloween Special Games
   function isHalloweenGame(g) {
     if (!g) return false;
@@ -1680,6 +1680,23 @@ document.addEventListener("DOMContentLoaded", () => {
   let iframeLoadTimeout = null;
   let iframeLoadSucceeded = false;
 
+  /**
+   * Constructs an isolated game iframe URL with ?gameId= query parameter
+   * for namespaced storage isolation (#493, #824).
+   * @param {Object|string} gameObj - Game object from registry or path string
+   * @returns {string} Fully qualified isolated URL
+   */
+  function buildIsolatedGameUrl(gameObj) {
+    if (!gameObj) return "";
+    const rawPath = typeof gameObj === "string" ? gameObj : (gameObj.path || "");
+    const gameId = typeof gameObj === "object" && gameObj !== null ? gameObj.id : "";
+    if (!rawPath) return "";
+    if (gameId && !rawPath.includes("gameId=")) {
+      return rawPath + (rawPath.includes("?") ? "&" : "?") + "gameId=" + encodeURIComponent(gameId);
+    }
+    return rawPath;
+  }
+
   function resetIframeBoundary() {
     if (iframeLoadTimeout) {
       clearTimeout(iframeLoadTimeout);
@@ -1732,7 +1749,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resetIframeBoundary();
         iframeLoadSucceeded = false;
         if (gameIframe && gameObj) {
-          gameIframe.src = gameObj.path;
+          gameIframe.src = buildIsolatedGameUrl(gameObj);
           startIframeTimeout(gameObj);
         }
       });
@@ -1768,7 +1785,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       try {
         return crypto.randomUUID();
-      } catch (_) {}
+      } catch (_) { }
     }
     if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
       const bytes = new Uint8Array(16);
@@ -1929,7 +1946,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       gameIframe.contentWindow.postMessage(payload, "*");
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function hookSoundEngineAudioSync() {
@@ -1937,7 +1954,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const origBroadcast = window.SoundEngine.broadcastAudioConfig;
     window.SoundEngine.broadcastAudioConfig = function () {
       if (typeof origBroadcast === "function") {
-        try { origBroadcast.apply(this, arguments); } catch (_) {}
+        try { origBroadcast.apply(this, arguments); } catch (_) { }
       }
       const audioState = syncAudioPreferences(!window.SoundEngine.enabled, window.SoundEngine.volume);
       broadcastVolumeSyncToGame(audioState.muted, audioState.volume);
@@ -1946,7 +1963,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const origSaveSettings = window.SoundEngine.saveSettings;
     window.SoundEngine.saveSettings = function () {
       if (typeof origSaveSettings === "function") {
-        try { origSaveSettings.apply(this, arguments); } catch (_) {}
+        try { origSaveSettings.apply(this, arguments); } catch (_) { }
       }
       syncAudioPreferences(!window.SoundEngine.enabled, window.SoundEngine.volume);
     };
@@ -1985,7 +2002,7 @@ document.addEventListener("DOMContentLoaded", () => {
             gain: audioState.muted ? 0 : audioState.volume
           }, "*");
         }
-      } catch (_) {}
+      } catch (_) { }
     });
 
     gameIframe.addEventListener("error", () => {
@@ -2026,6 +2043,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Modal rapid launch lock flag & cooldown timer to prevent race conditions (#504)
   let isOpeningModal = false;
   let modalLaunchCooldownTimer = null;
+  let closeModalCleanupTimer = null;
 
   // Modal Handlers
   function openGameModal(game, triggerElement = null, isDirectDeepLink = false) {
@@ -2038,6 +2056,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     isOpeningModal = true;
     document.body.classList.add("modal-launching-in-progress");
+
+    // Cancel any in-flight close cleanup that could rebind or blank the iframe mid-relaunch
+    if (closeModalCleanupTimer) { clearTimeout(closeModalCleanupTimer); closeModalCleanupTimer = null; }
 
     // Clear any previous cooldown
     if (modalLaunchCooldownTimer) clearTimeout(modalLaunchCooldownTimer);
@@ -2068,16 +2089,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const audioState = syncAudioPreferences();
 
-    // Storage Isolation Bridge: Pass gameId via URL parameter so SDK attaches namespaced proxy
-    let iframeUrl = game.path;
-    if (iframeUrl && !iframeUrl.includes("gameId=")) {
-      iframeUrl += (iframeUrl.includes("?") ? "&" : "?") + "gameId=" + encodeURIComponent(game.id);
-    }
-    if (iframeUrl && !iframeUrl.includes("av_muted=")) {
-      iframeUrl += (iframeUrl.includes("?") ? "&" : "?") + "av_muted=" + (audioState.muted ? "1" : "0") + "&av_vol=" + encodeURIComponent(audioState.volume);
-    }
+    // Storage Isolation Bridge: Pass gameId via URL parameter so SDK attaches namespaced proxy (#493, #824)
+    const iframeUrl = buildIsolatedGameUrl(game);
     gameIframe.src = iframeUrl;
-    newTabBtn.href = game.path;
+    if (newTabBtn) {
+      newTabBtn.href = iframeUrl;
+    }
 
     updateModalFavoriteButton(isFavorite(game.id));
     if (window.SoundEngine && typeof window.SoundEngine.updateUI === "function") {
@@ -2093,10 +2110,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (win && win.ArcadeVerse && typeof win.ArcadeVerse.enableAggressiveRAFShield === 'function') {
               win.ArcadeVerse.enableAggressiveRAFShield();
             }
-          } catch (_) {}
+          } catch (_) { }
         }, { once: true });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Record game play in Recently Played drawer
     if (window.ArcadeRecent && typeof window.ArcadeRecent.recordPlayed === "function") {
@@ -2223,7 +2240,7 @@ document.addEventListener("DOMContentLoaded", () => {
           try {
             gameIframe.contentWindow.focus();
             gameIframe.contentWindow.postMessage({ type: "ARCADEVERSE_RESUME" }, "*");
-          } catch (_) {}
+          } catch (_) { }
         }
       });
 
@@ -2243,7 +2260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gameIframe && gameIframe.contentWindow) {
       try {
         gameIframe.contentWindow.postMessage({ type: "ARCADEVERSE_PAUSE" }, "*");
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -2262,6 +2279,9 @@ document.addEventListener("DOMContentLoaded", () => {
     isGameSessionActive = false;
     gameModal.classList.remove("active");
     gameModal.setAttribute("aria-hidden", "true");
+    if (newTabBtn) {
+      newTabBtn.href = "#";
+    }
 
     // Standardized Game Lifecycle Bridge: Dispatch teardown & pause events before unmounting iframe
     try {
@@ -2273,22 +2293,33 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
           const win = gameIframe.contentWindow;
           if (win) {
-            // Cancel any high-numbered animation frame handles
+            // Dynamically discover and cancel active animation frame handles (#497, #825)
             if (typeof win.cancelAnimationFrame === "function") {
-              for (let frameId = 1; frameId < 9999; frameId++) {
-                win.cancelAnimationFrame(frameId);
+              if (typeof win.requestAnimationFrame === "function") {
+                const maxFrameId = win.requestAnimationFrame(() => { });
+                win.cancelAnimationFrame(maxFrameId);
+                if (typeof maxFrameId === "number" && maxFrameId > 0) {
+                  const minFrameId = Math.max(1, maxFrameId - 50000);
+                  for (let frameId = maxFrameId; frameId >= minFrameId; frameId--) {
+                    win.cancelAnimationFrame(frameId);
+                  }
+                }
+              } else {
+                for (let frameId = 1; frameId <= 1000; frameId++) {
+                  win.cancelAnimationFrame(frameId);
+                }
               }
             }
             // Clear any active timeouts/intervals left by rogue loops
             if (typeof win.clearTimeout === "function" && typeof win.clearInterval === "function") {
-              const maxTimerId = win.setTimeout(() => {}, 0);
+              const maxTimerId = win.setTimeout(() => { }, 0);
               for (let timerId = 1; timerId <= maxTimerId; timerId++) {
                 win.clearTimeout(timerId);
                 win.clearInterval(timerId);
               }
             }
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // Proactively probe and dispose WebGL contexts in child iframe if accessible
         try {
@@ -2300,19 +2331,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 const gl = c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl");
                 if (gl && !gl.isContextLost()) {
                   const loseExt = gl.getExtension("WEBGL_lose_context") ||
-                                  gl.getExtension("WEBKIT_WEBGL_lose_context") ||
-                                  gl.getExtension("MOZ_WEBGL_lose_context");
+                    gl.getExtension("WEBKIT_WEBGL_lose_context") ||
+                    gl.getExtension("MOZ_WEBGL_lose_context");
                   if (loseExt && typeof loseExt.loseContext === "function") {
                     loseExt.loseContext();
                   }
                 }
-              } catch (_) {}
+              } catch (_) { }
             });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
-    } catch (_) {}
-    
+    } catch (_) { }
+
     // Terminate any rogue event listeners or workers in child frame prior to blanking
     try {
       if (gameIframe && gameIframe.contentWindow) {
@@ -2321,11 +2352,12 @@ document.addEventListener("DOMContentLoaded", () => {
           win.stop();
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Safely blank out iframe after a 100ms grace period to allow games to close AudioContexts and stop RAF loops
     const currentFrame = gameIframe;
-    setTimeout(() => {
+    closeModalCleanupTimer = setTimeout(() => {
+      closeModalCleanupTimer = null;
       try {
         if (currentFrame && currentFrame.contentWindow) {
           currentFrame.contentWindow.location.replace("about:blank");
@@ -2348,22 +2380,24 @@ document.addEventListener("DOMContentLoaded", () => {
           newIframe.setAttribute("allow", "gamepad; autoplay; fullscreen");
           newIframe.src = "about:blank";
           parent.replaceChild(newIframe, currentFrame);
-          // Re-bind global reference
-          if (document.getElementById("game-iframe")) {
-            // Updated DOM element cleanly mounted
-          }
+          // Re-bind global reference so openGameModal can find the new live iframe node
+          gameIframe = document.getElementById("game-iframe");
+          if (!gameIframe) gameIframe = newIframe;
         }
-      } catch (_) {}
+      } catch (_) { }
     }, 100);
 
     document.body.style.overflow = "";
     document.body.style.overscrollBehavior = "";
+    if (gameIframe) gameIframe.style.touchAction = "";
+    const modalBodyReset = document.querySelector(".game-modal-body") || modalFrameWrapper;
+    if (modalBodyReset) modalBodyReset.style.touchAction = "";
     document.body.classList.remove("modal-launching-in-progress");
     isOpeningModal = false;
     modalWindow.classList.remove("fullscreen");
     if (gameModal) gameModal.classList.remove("fullscreen-mode");
     if (document.fullscreenElement || document.webkitFullscreenElement) {
-      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => { });
     }
     if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
       lastFocusedElement.focus();
@@ -2421,11 +2455,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (reloadBtn) {
     reloadBtn.addEventListener("click", () => {
-      if (gameIframe.src) {
-        const currentSrc = gameIframe.src;
+      const targetSrc = (activeGame && buildIsolatedGameUrl(activeGame)) || gameIframe.src;
+      if (targetSrc) {
         gameIframe.src = "";
         setTimeout(() => {
-          gameIframe.src = currentSrc;
+          gameIframe.src = targetSrc;
         }, 50);
       }
     });
@@ -2504,7 +2538,7 @@ document.addEventListener("DOMContentLoaded", () => {
           gameIframe.contentWindow.postMessage({ type: "ARCADEVERSE_PAUSE" }, "*");
           gameIframe.contentWindow.postMessage({ type: "ARCADEVERSE_ESC_PAUSE" }, "*");
         }
-      } catch (_) {}
+      } catch (_) { }
 
       showEscExitToast();
 
@@ -2516,7 +2550,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Announce session close to active listeners
       try {
         window.dispatchEvent(new CustomEvent("arcadeverse:esc-exit-confirmed"));
-      } catch (_) {}
+      } catch (_) { }
       // Second press within 1.5s: close modal with protection
       if (escPressTimer) clearTimeout(escPressTimer);
       escPressCount = 0;
@@ -2609,15 +2643,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (navigator && typeof navigator.vibrate === "function") {
           navigator.vibrate(e.data.pattern || 20);
         }
-      } catch (_) {}
+      } catch (_) { }
       return;
     }
 
-  // Screen reader score announcement throttler (#513)
-  let lastAnnouncedScore = 0;
-  let lastScoreAnnouncementTime = 0;
+    // Screen reader score announcement throttler (#513)
+    let lastAnnouncedScore = 0;
+    let lastScoreAnnouncementTime = 0;
 
-  // Handle score events from verified child games
+    // Handle score events from verified child games
     if (type === "ARCADEVERSE_GAME_SCORE") {
       const score = Number(e.data.score) || 0;
       const now = Date.now();
@@ -2737,7 +2771,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentFs) {
         try {
           if (document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
+            document.exitFullscreen().catch(() => { });
           } else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen();
           } else if (document.mozCancelFullScreen) {
@@ -2745,7 +2779,7 @@ document.addEventListener("DOMContentLoaded", () => {
           } else if (document.msExitFullscreen) {
             document.msExitFullscreen();
           }
-        } catch (_err) {}
+        } catch (_err) { }
       }
     }
 
@@ -2764,7 +2798,7 @@ document.addEventListener("DOMContentLoaded", () => {
             type: "AV_FULLSCREEN_CHANGE",
             payload: { isFullscreen: true, mode: "pseudo" }
           }, "*");
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
 
@@ -2780,7 +2814,7 @@ document.addEventListener("DOMContentLoaded", () => {
             type: "AV_FULLSCREEN_CHANGE",
             payload: { isFullscreen: false, mode: "pseudo" }
           }, "*");
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
   });
@@ -2906,40 +2940,273 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { passive: false });
   }
 
-  // Inject gesture protections and styles inside the game iframe on load
-  function guardIframeTouchInteractions() {
+  // ==========================================================================
+  // ADAPTIVE IFRAME TOUCH & GESTURE GUARD (Issue #519, #827)
+  // Restricts strict touch-action: none to canvas action games, while enabling
+  // native vertical pan-y touch scrolling for scrollable narrative & puzzle games.
+  // ==========================================================================
+  function guardIframeTouchInteractions(iframeElement) {
     try {
-      if (!gameIframe) return;
-      const doc = gameIframe.contentDocument || (gameIframe.contentWindow && gameIframe.contentWindow.document);
+      const targetIframe = (iframeElement && iframeElement.nodeType) ? iframeElement : (document.getElementById("game-iframe") || gameIframe);
+      if (!targetIframe) return;
+      const win = targetIframe.contentWindow;
+      const doc = targetIframe.contentDocument || (win && win.document);
       if (!doc) return;
 
-      if (doc.documentElement) {
-        doc.documentElement.style.overscrollBehavior = "contain";
-        doc.documentElement.style.touchAction = "none";
-      }
-      if (doc.body) {
-        doc.body.style.overscrollBehavior = "contain";
-        doc.body.style.touchAction = "none";
+      // Helper to detect explicit scroll locking attributes
+      function hasExplicitScrollLock(targetDoc) {
+        if (!targetDoc) return false;
+        if (targetDoc.documentElement) {
+          const val = targetDoc.documentElement.getAttribute("data-scroll-lock");
+          if (val === "true" || val === "") return true;
+          if (val === "false") return false;
+        }
+        if (targetDoc.body) {
+          const val = targetDoc.body.getAttribute("data-scroll-lock");
+          if (val === "true" || val === "") return true;
+          if (val === "false") return false;
+        }
+        const el = targetDoc.querySelector("[data-scroll-lock]");
+        if (el) {
+          const val = el.getAttribute("data-scroll-lock");
+          return val !== "false";
+        }
+        return false;
       }
 
-      if (doc.head && !doc.getElementById("arcadeverse-touch-guard-css")) {
-        const style = doc.createElement("style");
-        style.id = "arcadeverse-touch-guard-css";
-        style.textContent = `
-          html, body, canvas, #canvas, .game-canvas {
-            touch-action: none !important;
-            overscroll-behavior: contain !important;
-            overscroll-behavior-y: contain !important;
-            -webkit-user-select: none !important;
-            user-select: none !important;
-            -webkit-touch-callout: none !important;
+      // Helper to detect explicit scrollable opt-in attributes
+      function hasExplicitScrollable(targetDoc) {
+        if (!targetDoc) return false;
+        if (targetDoc.documentElement) {
+          const val = targetDoc.documentElement.getAttribute("data-scrollable");
+          if (val === "true" || val === "") return true;
+          if (val === "false") return false;
+        }
+        if (targetDoc.body) {
+          const val = targetDoc.body.getAttribute("data-scrollable");
+          if (val === "true" || val === "") return true;
+          if (val === "false") return false;
+        }
+        const el = targetDoc.querySelector("[data-scrollable]");
+        if (el) {
+          const val = el.getAttribute("data-scrollable");
+          return val !== "false";
+        }
+        return false;
+      }
+
+      // Determine whether the game document is scrollable or locked
+      function detectIsScrollable() {
+        try {
+          if (!doc) return false;
+
+          // 1. Explicit opt-ins / opt-outs
+          if (hasExplicitScrollLock(doc)) return false;
+          if (hasExplicitScrollable(doc)) return true;
+
+          // 2. Viewport height vs child document height
+          const winHeight = (win && win.innerHeight) || (targetIframe && targetIframe.clientHeight) || window.innerHeight || 0;
+          const rootScrollHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+          const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
+          const maxDocHeight = Math.max(rootScrollHeight, bodyScrollHeight);
+
+          if (winHeight > 0 && maxDocHeight > winHeight + 8) {
+            return true;
           }
-        `;
-        doc.head.appendChild(style);
+
+          // 3. Scrollable non-canvas containers inside child document (e.g. overflow: auto/scroll panels)
+          const scrollableContainers = doc.querySelectorAll("div, section, main, article, ul, ol");
+          for (let i = 0; i < scrollableContainers.length; i++) {
+            const el = scrollableContainers[i];
+            if (el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 8) {
+              const compStyle = win && win.getComputedStyle ? win.getComputedStyle(el) : null;
+              const overflowY = compStyle ? compStyle.overflowY : "";
+              if (overflowY === "auto" || overflowY === "scroll" || el.scrollHeight > winHeight) {
+                return true;
+              }
+            }
+          }
+
+          // 4. Pure DOM / puzzle / narrative games without canvas elements
+          const canvases = doc.querySelectorAll("canvas, #canvas, .game-canvas");
+          if (canvases.length === 0) {
+            return true;
+          }
+
+          return false;
+        } catch (_) {
+          return false;
+        }
       }
 
-      preventMultiTouchGestures(doc);
-    } catch (_) {}
+      function applyAdaptiveTouchGuard() {
+        try {
+          if (!doc || !doc.body) return;
+          const isScrollable = detectIsScrollable();
+
+          // Sync parent wrapper and iframe touch-actions
+          if (targetIframe) {
+            targetIframe.style.touchAction = isScrollable ? "pan-y" : "none";
+          }
+          const modalBodyEl = document.querySelector(".game-modal-body") || modalFrameWrapper;
+          if (modalBodyEl) {
+            modalBodyEl.style.touchAction = isScrollable ? "pan-y" : "none";
+          }
+
+          let styleEl = doc.getElementById("arcadeverse-touch-guard-css");
+          if (!styleEl && doc.head) {
+            styleEl = doc.createElement("style");
+            styleEl.id = "arcadeverse-touch-guard-css";
+            doc.head.appendChild(styleEl);
+          }
+
+          if (isScrollable) {
+            // Narrative / Puzzle / Scrollable DOM Games
+            if (doc.documentElement) {
+              doc.documentElement.style.overscrollBehavior = "contain";
+              doc.documentElement.style.overscrollBehaviorY = "contain";
+              doc.documentElement.style.touchAction = "pan-y";
+            }
+            if (doc.body) {
+              doc.body.style.overscrollBehavior = "contain";
+              doc.body.style.overscrollBehaviorY = "contain";
+              doc.body.style.touchAction = "pan-y";
+            }
+
+            if (styleEl) {
+              styleEl.textContent = `
+                html, body {
+                  touch-action: pan-y !important;
+                  overscroll-behavior: contain !important;
+                  overscroll-behavior-y: contain !important;
+                  -webkit-overflow-scrolling: touch;
+                }
+                canvas, #canvas, .game-canvas {
+                  touch-action: none !important;
+                  overscroll-behavior: contain !important;
+                  overscroll-behavior-y: contain !important;
+                  -webkit-user-select: none !important;
+                  user-select: none !important;
+                  -webkit-touch-callout: none !important;
+                }
+              `;
+            }
+          } else {
+            // Full-Viewport Locked Games (e.g. Canvas Action / Joystick Games)
+            if (doc.documentElement) {
+              doc.documentElement.style.overscrollBehavior = "contain";
+              doc.documentElement.style.overscrollBehaviorY = "contain";
+              doc.documentElement.style.touchAction = "none";
+            }
+            if (doc.body) {
+              doc.body.style.overscrollBehavior = "contain";
+              doc.body.style.overscrollBehaviorY = "contain";
+              doc.body.style.touchAction = "none";
+            }
+
+            if (styleEl) {
+              styleEl.textContent = `
+                html, body, canvas, #canvas, .game-canvas {
+                  touch-action: none !important;
+                  overscroll-behavior: contain !important;
+                  overscroll-behavior-y: contain !important;
+                  -webkit-user-select: none !important;
+                  user-select: none !important;
+                  -webkit-touch-callout: none !important;
+                }
+              `;
+            }
+          }
+        } catch (_) { }
+      }
+
+      // Apply initial guard styling
+      applyAdaptiveTouchGuard();
+
+      // Attach gesture safety listeners inside child frame (only once per child document)
+      if (!doc.__arcadeverseTouchGuarded) {
+        doc.__arcadeverseTouchGuarded = true;
+
+        // Prevent multi-touch pinch-zoom (2 or more touches)
+        doc.addEventListener("touchstart", (e) => {
+          if (e.touches && e.touches.length > 1 && e.cancelable) {
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        doc.addEventListener("touchmove", (e) => {
+          // Block multi-touch pinch-zoom
+          if (e.touches && e.touches.length > 1) {
+            if (e.cancelable) e.preventDefault();
+            return;
+          }
+
+          // Allow vertical scrolling on scrollable DOM/narrative games,
+          // while blocking pull-to-refresh and unintended scrolling on canvases or locked action games
+          const isScrollable = detectIsScrollable();
+          const isCanvasTarget = e.target && (
+            e.target.tagName === "CANVAS" ||
+            (typeof e.target.closest === "function" && e.target.closest("canvas, .game-canvas, #canvas"))
+          );
+
+          if (!isScrollable || isCanvasTarget) {
+            if (e.cancelable) {
+              e.preventDefault();
+            }
+          }
+        }, { passive: false });
+
+        // Prevent iOS WebKit pinch-to-zoom / multi-finger gesture events
+        ["gesturestart", "gesturechange", "gestureend"].forEach((evtName) => {
+          doc.addEventListener(evtName, (e) => {
+            if (e.cancelable) e.preventDefault();
+          }, { passive: false });
+        });
+      }
+
+      // Re-evaluate on orientation change, window resize, or dynamic DOM changes
+      let debounceTimer = null;
+      function debouncedApply() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          applyAdaptiveTouchGuard();
+        }, 50);
+      }
+
+      if (win && !win.__arcadeverseTouchGuardBound) {
+        win.__arcadeverseTouchGuardBound = true;
+        win.addEventListener("resize", debouncedApply, { passive: true });
+        win.addEventListener("orientationchange", debouncedApply, { passive: true });
+
+        if (typeof win.ResizeObserver === "function" && doc.body) {
+          try {
+            const ro = new win.ResizeObserver(() => {
+              debouncedApply();
+            });
+            ro.observe(doc.body);
+          } catch (_) { }
+        }
+
+        if (typeof win.MutationObserver === "function" && doc.body) {
+          try {
+            const mo = new win.MutationObserver(() => {
+              debouncedApply();
+            });
+            mo.observe(doc.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ["data-scroll-lock", "data-scrollable", "style", "class"]
+            });
+          } catch (_) { }
+        }
+      }
+
+      // Deferred checks to catch delayed async rendering
+      setTimeout(applyAdaptiveTouchGuard, 120);
+      setTimeout(applyAdaptiveTouchGuard, 400);
+      setTimeout(applyAdaptiveTouchGuard, 1000);
+    } catch (_) { }
   }
 
   // ===================================================
@@ -3564,7 +3831,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Match wide action / arcade / racer / flight games
     const wideKeywords = /racer|drive|flight|pong|hockey|lander|defense|invaders|tanks|runner|flappy|space|retro|miner|breakout|curling|glider|rogue|sub|fleet|wave/i;
@@ -3583,7 +3850,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const isTouch = window.matchMedia && (window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches);
-    
+
     // Check orientation accurately across modern and older mobile browsers
     const isPortrait = (screen.orientation && screen.orientation.type)
       ? screen.orientation.type.startsWith('portrait')
@@ -3916,7 +4183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         closeAutocomplete();
         renderGames();
       }
-    } catch (_) {}
+    } catch (_) { }
   });
 
   // ========================================================
@@ -4027,104 +4294,104 @@ document.addEventListener("DOMContentLoaded", () => {
   initControlsLegend();
 });
 
-  // ========================================================
-  // INTERACTIVE GAME CONTROLS LEGEND & INPUT MAP ENGINE (#Feature)
-  // Dynamic extraction, keymap visualization, and toolbar integration
-  // ========================================================
-  let controlsLegendDialog = null;
-  let controlsLegendBtn = null;
-  let closeControlsLegend = () => {};
+// ========================================================
+// INTERACTIVE GAME CONTROLS LEGEND & INPUT MAP ENGINE (#Feature)
+// Dynamic extraction, keymap visualization, and toolbar integration
+// ========================================================
+let controlsLegendDialog = null;
+let controlsLegendBtn = null;
+let closeControlsLegend = () => { };
 
-  function getGameControlsConfig(game) {
-    if (!game) {
-      return {
-        bindings: [
-          { keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Directional Movement" },
-          { keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Directional Move" },
-          { keys: ["Space"], codeKeys: ["Space"], action: "Primary Action / Jump" },
-          { keys: ["P"], codeKeys: ["KeyP"], action: "Pause / Resume Game" },
-          { keys: ["R"], codeKeys: ["KeyR"], action: "Restart Session" },
-          { keys: ["Esc"], codeKeys: ["Escape"], action: "Close Game Player" }
-        ],
-        activeKeys: new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space", "KeyP", "KeyR", "Escape"]),
-        touchControls: [
-          { label: "Tap Screen", desc: "Jump / Fire / Confirm" },
-          { label: "Swipe / Drag", desc: "Directional Motion / Aim" }
-        ]
-      };
-    }
-
-    const category = (game.category || "").toLowerCase();
-    const tags = Array.isArray(game.tags) ? game.tags.map((t) => t.toLowerCase()) : [];
-    const title = (game.title || "").toLowerCase();
-    const desc = (game.description || "").toLowerCase();
-
-    const isShooter = category.includes("shooter") || tags.includes("shooter") || desc.includes("shoot") || desc.includes("blast") || desc.includes("laser");
-    const isPlatformer = category.includes("platformer") || tags.includes("platformer") || desc.includes("jump") || desc.includes("bounce");
-    const isRacing = category.includes("racing") || tags.includes("racing") || desc.includes("drive") || desc.includes("drift") || desc.includes("racer");
-    const isPuzzle = category.includes("puzzle") || tags.includes("puzzle") || category.includes("board") || tags.includes("logic") || tags.includes("word");
-    const isRhythm = category.includes("rhythm") || tags.includes("rhythm") || tags.includes("music") || title.includes("typer") || tags.includes("typing");
-
-    const bindings = [];
-    const activeKeys = new Set(["KeyP", "KeyR", "Escape"]);
-
-    if (isShooter) {
-      bindings.push({ keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Thrust & Directional Steering" });
-      bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Arrow Steering" });
-      bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Primary Fire / Plasma Blaster" });
-      bindings.push({ keys: ["Shift"], codeKeys: ["ShiftLeft", "ShiftRight"], action: "Hyper-Drive / Afterburner Boost" });
-      ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space", "ShiftLeft", "ShiftRight"].forEach((k) => activeKeys.add(k));
-    } else if (isPlatformer || isRacing) {
-      bindings.push({ keys: ["A", "D"], codeKeys: ["KeyA", "KeyD"], action: "Steer Left / Steer Right" });
-      bindings.push({ keys: ["←", "→"], codeKeys: ["ArrowLeft", "ArrowRight"], action: "Alternative Steering Keys" });
-      bindings.push({ keys: ["W", "↑", "Space"], codeKeys: ["KeyW", "ArrowUp", "Space"], action: "Jump / Accelerate" });
-      bindings.push({ keys: ["S", "↓"], codeKeys: ["KeyS", "ArrowDown"], action: "Duck / Slide / Brake" });
-      ["KeyA", "KeyD", "ArrowLeft", "ArrowRight", "KeyW", "ArrowUp", "Space", "KeyS", "ArrowDown"].forEach((k) => activeKeys.add(k));
-    } else if (isRhythm) {
-      bindings.push({ keys: ["D", "F", "J", "K"], codeKeys: ["KeyD", "KeyF", "KeyJ", "KeyK"], action: "Rhythm Lane Beats" });
-      bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Bass Beat / Stomp" });
-      bindings.push({ keys: ["A - Z"], codeKeys: ["KeyA", "KeyB", "KeyC", "KeyD", "KeyE", "KeyF"], action: "Typing Terminal Defense Keys" });
-      ["KeyD", "KeyF", "KeyJ", "KeyK", "Space", "KeyA", "KeyB", "KeyC"].forEach((k) => activeKeys.add(k));
-    } else if (isPuzzle) {
-      bindings.push({ keys: ["Left Click"], codeKeys: [], action: "Select & Interact with Puzzle Elements" });
-      bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Grid Shift / Tile Navigation" });
-      bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Confirm / Rotate Piece" });
-      ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space"].forEach((k) => activeKeys.add(k));
-    } else {
-      bindings.push({ keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Directional Motion" });
-      bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Arrow Movement" });
-      bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Primary Action / Start" });
-      ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space"].forEach((k) => activeKeys.add(k));
-    }
-
-    bindings.push({ keys: ["P"], codeKeys: ["KeyP"], action: "Pause / Resume Gameplay" });
-    bindings.push({ keys: ["R"], codeKeys: ["KeyR"], action: "Quick Restart Session" });
-    bindings.push({ keys: ["Esc"], codeKeys: ["Escape"], action: "Exit Player Modal" });
-
-    const touchControls = [
-      { label: "Tap Screen", desc: "Jump / Fire / Select Action" },
-      { label: "Swipe / Drag", desc: "Directional Motion / Aim Cursor" }
-    ];
-
-    return { bindings, activeKeys, touchControls };
+function getGameControlsConfig(game) {
+  if (!game) {
+    return {
+      bindings: [
+        { keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Directional Movement" },
+        { keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Directional Move" },
+        { keys: ["Space"], codeKeys: ["Space"], action: "Primary Action / Jump" },
+        { keys: ["P"], codeKeys: ["KeyP"], action: "Pause / Resume Game" },
+        { keys: ["R"], codeKeys: ["KeyR"], action: "Restart Session" },
+        { keys: ["Esc"], codeKeys: ["Escape"], action: "Close Game Player" }
+      ],
+      activeKeys: new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space", "KeyP", "KeyR", "Escape"]),
+      touchControls: [
+        { label: "Tap Screen", desc: "Jump / Fire / Confirm" },
+        { label: "Swipe / Drag", desc: "Directional Motion / Aim" }
+      ]
+    };
   }
 
-  function renderKeyboardVisualizer(activeKeys) {
-    const isWActive = activeKeys.has("KeyW");
-    const isAActive = activeKeys.has("KeyA");
-    const isSActive = activeKeys.has("KeyS");
-    const isDActive = activeKeys.has("KeyD");
-    const isUpActive = activeKeys.has("ArrowUp");
-    const isLeftActive = activeKeys.has("ArrowLeft");
-    const isDownActive = activeKeys.has("ArrowDown");
-    const isRightActive = activeKeys.has("ArrowRight");
-    const isSpaceActive = activeKeys.has("Space");
-    const isShiftActive = activeKeys.has("ShiftLeft") || activeKeys.has("ShiftRight");
-    const isPActive = activeKeys.has("KeyP");
-    const isRActive = activeKeys.has("KeyR");
-    const isEscActive = activeKeys.has("Escape");
+  const category = (game.category || "").toLowerCase();
+  const tags = Array.isArray(game.tags) ? game.tags.map((t) => t.toLowerCase()) : [];
+  const title = (game.title || "").toLowerCase();
+  const desc = (game.description || "").toLowerCase();
 
-    return `
+  const isShooter = category.includes("shooter") || tags.includes("shooter") || desc.includes("shoot") || desc.includes("blast") || desc.includes("laser");
+  const isPlatformer = category.includes("platformer") || tags.includes("platformer") || desc.includes("jump") || desc.includes("bounce");
+  const isRacing = category.includes("racing") || tags.includes("racing") || desc.includes("drive") || desc.includes("drift") || desc.includes("racer");
+  const isPuzzle = category.includes("puzzle") || tags.includes("puzzle") || category.includes("board") || tags.includes("logic") || tags.includes("word");
+  const isRhythm = category.includes("rhythm") || tags.includes("rhythm") || tags.includes("music") || title.includes("typer") || tags.includes("typing");
+
+  const bindings = [];
+  const activeKeys = new Set(["KeyP", "KeyR", "Escape"]);
+
+  if (isShooter) {
+    bindings.push({ keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Thrust & Directional Steering" });
+    bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Arrow Steering" });
+    bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Primary Fire / Plasma Blaster" });
+    bindings.push({ keys: ["Shift"], codeKeys: ["ShiftLeft", "ShiftRight"], action: "Hyper-Drive / Afterburner Boost" });
+    ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space", "ShiftLeft", "ShiftRight"].forEach((k) => activeKeys.add(k));
+  } else if (isPlatformer || isRacing) {
+    bindings.push({ keys: ["A", "D"], codeKeys: ["KeyA", "KeyD"], action: "Steer Left / Steer Right" });
+    bindings.push({ keys: ["←", "→"], codeKeys: ["ArrowLeft", "ArrowRight"], action: "Alternative Steering Keys" });
+    bindings.push({ keys: ["W", "↑", "Space"], codeKeys: ["KeyW", "ArrowUp", "Space"], action: "Jump / Accelerate" });
+    bindings.push({ keys: ["S", "↓"], codeKeys: ["KeyS", "ArrowDown"], action: "Duck / Slide / Brake" });
+    ["KeyA", "KeyD", "ArrowLeft", "ArrowRight", "KeyW", "ArrowUp", "Space", "KeyS", "ArrowDown"].forEach((k) => activeKeys.add(k));
+  } else if (isRhythm) {
+    bindings.push({ keys: ["D", "F", "J", "K"], codeKeys: ["KeyD", "KeyF", "KeyJ", "KeyK"], action: "Rhythm Lane Beats" });
+    bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Bass Beat / Stomp" });
+    bindings.push({ keys: ["A - Z"], codeKeys: ["KeyA", "KeyB", "KeyC", "KeyD", "KeyE", "KeyF"], action: "Typing Terminal Defense Keys" });
+    ["KeyD", "KeyF", "KeyJ", "KeyK", "Space", "KeyA", "KeyB", "KeyC"].forEach((k) => activeKeys.add(k));
+  } else if (isPuzzle) {
+    bindings.push({ keys: ["Left Click"], codeKeys: [], action: "Select & Interact with Puzzle Elements" });
+    bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Grid Shift / Tile Navigation" });
+    bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Confirm / Rotate Piece" });
+    ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space"].forEach((k) => activeKeys.add(k));
+  } else {
+    bindings.push({ keys: ["W", "A", "S", "D"], codeKeys: ["KeyW", "KeyA", "KeyS", "KeyD"], action: "Directional Motion" });
+    bindings.push({ keys: ["↑", "←", "↓", "→"], codeKeys: ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"], action: "Alternative Arrow Movement" });
+    bindings.push({ keys: ["Space"], codeKeys: ["Space"], action: "Primary Action / Start" });
+    ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "Space"].forEach((k) => activeKeys.add(k));
+  }
+
+  bindings.push({ keys: ["P"], codeKeys: ["KeyP"], action: "Pause / Resume Gameplay" });
+  bindings.push({ keys: ["R"], codeKeys: ["KeyR"], action: "Quick Restart Session" });
+  bindings.push({ keys: ["Esc"], codeKeys: ["Escape"], action: "Exit Player Modal" });
+
+  const touchControls = [
+    { label: "Tap Screen", desc: "Jump / Fire / Select Action" },
+    { label: "Swipe / Drag", desc: "Directional Motion / Aim Cursor" }
+  ];
+
+  return { bindings, activeKeys, touchControls };
+}
+
+function renderKeyboardVisualizer(activeKeys) {
+  const isWActive = activeKeys.has("KeyW");
+  const isAActive = activeKeys.has("KeyA");
+  const isSActive = activeKeys.has("KeyS");
+  const isDActive = activeKeys.has("KeyD");
+  const isUpActive = activeKeys.has("ArrowUp");
+  const isLeftActive = activeKeys.has("ArrowLeft");
+  const isDownActive = activeKeys.has("ArrowDown");
+  const isRightActive = activeKeys.has("ArrowRight");
+  const isSpaceActive = activeKeys.has("Space");
+  const isShiftActive = activeKeys.has("ShiftLeft") || activeKeys.has("ShiftRight");
+  const isPActive = activeKeys.has("KeyP");
+  const isRActive = activeKeys.has("KeyR");
+  const isEscActive = activeKeys.has("Escape");
+
+  return `
       <div class="legend-keyboard-grid">
         <div class="legend-keys-cluster-row">
           <!-- WASD Cluster -->
@@ -4161,55 +4428,55 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
     `;
-  }
+}
 
-  function initControlsLegend() {
-    const modalControls = document.querySelector(".modal-controls");
-    const modalWindow = document.querySelector(".modal-window");
-    if (!modalControls || !modalWindow) return;
+function initControlsLegend() {
+  const modalControls = document.querySelector(".modal-controls");
+  const modalWindow = document.querySelector(".modal-window");
+  if (!modalControls || !modalWindow) return;
 
-    // Inject Toolbar Button before bug report button or close button
-    controlsLegendBtn = document.createElement("button");
-    controlsLegendBtn.type = "button";
-    controlsLegendBtn.className = "btn btn-sm btn-icon btn-controls-legend";
-    controlsLegendBtn.id = "modal-controls-legend-btn";
-    controlsLegendBtn.title = "View Game Controls & Input Map (K)";
-    controlsLegendBtn.setAttribute("aria-label", "View Game Controls and Input Map");
-    controlsLegendBtn.setAttribute("aria-haspopup", "dialog");
-    controlsLegendBtn.setAttribute("aria-expanded", "false");
-    controlsLegendBtn.innerHTML = `
+  // Inject Toolbar Button before bug report button or close button
+  controlsLegendBtn = document.createElement("button");
+  controlsLegendBtn.type = "button";
+  controlsLegendBtn.className = "btn btn-sm btn-icon btn-controls-legend";
+  controlsLegendBtn.id = "modal-controls-legend-btn";
+  controlsLegendBtn.title = "View Game Controls & Input Map (K)";
+  controlsLegendBtn.setAttribute("aria-label", "View Game Controls and Input Map");
+  controlsLegendBtn.setAttribute("aria-haspopup", "dialog");
+  controlsLegendBtn.setAttribute("aria-expanded", "false");
+  controlsLegendBtn.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect width="20" height="16" x="2" y="4" rx="2"></rect>
         <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path>
       </svg>
     `;
 
-    const reportBugBtn = document.getElementById("modal-report-bug-btn");
-    const closeBtn = document.getElementById("close-modal-btn");
-    if (reportBugBtn) {
-      modalControls.insertBefore(controlsLegendBtn, reportBugBtn);
-    } else if (closeBtn) {
-      modalControls.insertBefore(controlsLegendBtn, closeBtn);
-    } else {
-      modalControls.appendChild(controlsLegendBtn);
-    }
+  const reportBugBtn = document.getElementById("modal-report-bug-btn");
+  const closeBtn = document.getElementById("close-modal-btn");
+  if (reportBugBtn) {
+    modalControls.insertBefore(controlsLegendBtn, reportBugBtn);
+  } else if (closeBtn) {
+    modalControls.insertBefore(controlsLegendBtn, closeBtn);
+  } else {
+    modalControls.appendChild(controlsLegendBtn);
+  }
 
-    // Build Floating Controls Legend Dialog
-    controlsLegendDialog = document.createElement("div");
-    controlsLegendDialog.id = "modal-controls-legend-dialog";
-    controlsLegendDialog.className = "controls-legend-overlay";
-    controlsLegendDialog.setAttribute("role", "dialog");
-    controlsLegendDialog.setAttribute("aria-modal", "true");
-    controlsLegendDialog.setAttribute("aria-labelledby", "controls-legend-title");
-    controlsLegendDialog.style.display = "none";
-    modalWindow.appendChild(controlsLegendDialog);
+  // Build Floating Controls Legend Dialog
+  controlsLegendDialog = document.createElement("div");
+  controlsLegendDialog.id = "modal-controls-legend-dialog";
+  controlsLegendDialog.className = "controls-legend-overlay";
+  controlsLegendDialog.setAttribute("role", "dialog");
+  controlsLegendDialog.setAttribute("aria-modal", "true");
+  controlsLegendDialog.setAttribute("aria-labelledby", "controls-legend-title");
+  controlsLegendDialog.style.display = "none";
+  modalWindow.appendChild(controlsLegendDialog);
 
-    function updateControlsContent() {
-      const config = getGameControlsConfig(activeGame);
-      const gameTitle = activeGame ? activeGame.title : "Community Arcade Game";
+  function updateControlsContent() {
+    const config = getGameControlsConfig(activeGame);
+    const gameTitle = activeGame ? activeGame.title : "Community Arcade Game";
 
-      const actionsHtml = config.bindings
-        .map((b) => `
+    const actionsHtml = config.bindings
+      .map((b) => `
           <div class="legend-action-row">
             <div class="legend-action-keys">
               ${b.keys.map((k) => `<span class="legend-action-key-pill">${k}</span>`).join("")}
@@ -4217,10 +4484,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="legend-action-desc">${b.action}</span>
           </div>
         `)
-        .join("");
+      .join("");
 
-      const touchHtml = config.touchControls
-        .map((t) => `
+    const touchHtml = config.touchControls
+      .map((t) => `
           <div class="legend-touch-card">
             <svg class="legend-touch-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect>
@@ -4232,9 +4499,9 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
           </div>
         `)
-        .join("");
+      .join("");
 
-      controlsLegendDialog.innerHTML = `
+    controlsLegendDialog.innerHTML = `
         <div class="controls-legend-card">
           <div class="controls-legend-header">
             <div class="controls-legend-title-wrap">
@@ -4291,154 +4558,154 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `;
 
-      const dialogCloseBtn = controlsLegendDialog.querySelector("#close-controls-legend-btn");
-      const dialogDismissBtn = controlsLegendDialog.querySelector("#dismiss-controls-legend-btn");
-      if (dialogCloseBtn) dialogCloseBtn.addEventListener("click", closeControlsLegend);
-      if (dialogDismissBtn) dialogDismissBtn.addEventListener("click", closeControlsLegend);
-    }
+    const dialogCloseBtn = controlsLegendDialog.querySelector("#close-controls-legend-btn");
+    const dialogDismissBtn = controlsLegendDialog.querySelector("#dismiss-controls-legend-btn");
+    if (dialogCloseBtn) dialogCloseBtn.addEventListener("click", closeControlsLegend);
+    if (dialogDismissBtn) dialogDismissBtn.addEventListener("click", closeControlsLegend);
+  }
 
-    // Tactile Web Audio Mechanical Switch Sound Synthesizer
-    function playKeycapAudio() {
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        if (window.ArcadeAudio && typeof window.ArcadeAudio.isMuted === "function" && window.ArcadeAudio.isMuted()) return;
-        const ctx = new AudioCtx();
-        if (ctx.state === "suspended") {
-          ctx.resume();
-        }
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(650, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.02);
-
-        filter.type = "bandpass";
-        filter.frequency.setValueAtTime(800, ctx.currentTime);
-        filter.Q.setValueAtTime(2, ctx.currentTime);
-
-        gain.gain.setValueAtTime(0.06, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start();
-        osc.stop(ctx.currentTime + 0.03);
-        setTimeout(() => {
-          if (ctx.state !== "closed") ctx.close();
-        }, 60);
-      } catch (_) {}
-    }
-
-    // Live Physical Keypress Tester Event Handlers
-    function handleKeyTesterDown(e) {
-      if (!controlsLegendDialog || controlsLegendDialog.style.display !== "flex") return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        closeControlsLegend();
-        return;
+  // Tactile Web Audio Mechanical Switch Sound Synthesizer
+  function playKeycapAudio() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (window.ArcadeAudio && typeof window.ArcadeAudio.isMuted === "function" && window.ArcadeAudio.isMuted()) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === "suspended") {
+        ctx.resume();
       }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
 
-      const code = e.code;
-      const keycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="${code}"]`);
-      if (keycap) {
-        if (!keycap.classList.contains("pressed")) {
-          keycap.classList.add("pressed");
-          playKeycapAudio();
-        }
-      } else if (code === "ShiftRight") {
-        const shiftKeycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="ShiftLeft"]`);
-        if (shiftKeycap && !shiftKeycap.classList.contains("pressed")) {
-          shiftKeycap.classList.add("pressed");
-          playKeycapAudio();
-        }
-      }
-    }
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(650, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.02);
 
-    function handleKeyTesterUp(e) {
-      if (!controlsLegendDialog || controlsLegendDialog.style.display !== "flex") return;
-      const code = e.code;
-      const keycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="${code}"]`);
-      if (keycap) {
-        keycap.classList.remove("pressed");
-      } else if (code === "ShiftRight") {
-        const shiftKeycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="ShiftLeft"]`);
-        if (shiftKeycap) shiftKeycap.classList.remove("pressed");
-      }
-    }
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(800, ctx.currentTime);
+      filter.Q.setValueAtTime(2, ctx.currentTime);
 
-    window.addEventListener("keydown", handleKeyTesterDown);
-    window.addEventListener("keyup", handleKeyTesterUp);
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
 
-    closeControlsLegend = function () {
-      if (!controlsLegendDialog) return;
-      controlsLegendDialog.style.display = "none";
-      if (controlsLegendBtn) {
-        controlsLegendBtn.classList.remove("active");
-        controlsLegendBtn.setAttribute("aria-expanded", "false");
-        try {
-          controlsLegendBtn.focus();
-        } catch (_) {}
-      }
-      const pressed = controlsLegendDialog.querySelectorAll(".legend-keycap.pressed");
-      pressed.forEach((p) => p.classList.remove("pressed"));
-    };
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
 
-    function openControlsLegend() {
-      if (!controlsLegendDialog) return;
-      updateControlsContent();
-      controlsLegendDialog.style.display = "flex";
-      if (controlsLegendBtn) {
-        controlsLegendBtn.classList.add("active");
-        controlsLegendBtn.setAttribute("aria-expanded", "true");
-      }
-      const closeBtn = controlsLegendDialog.querySelector("#close-controls-legend-btn");
-      if (closeBtn) {
-        setTimeout(() => closeBtn.focus(), 50);
-      }
-    }
+      osc.start();
+      osc.stop(ctx.currentTime + 0.03);
+      setTimeout(() => {
+        if (ctx.state !== "closed") ctx.close();
+      }, 60);
+    } catch (_) { }
+  }
 
-    controlsLegendBtn.addEventListener("click", (e) => {
+  // Live Physical Keypress Tester Event Handlers
+  function handleKeyTesterDown(e) {
+    if (!controlsLegendDialog || controlsLegendDialog.style.display !== "flex") return;
+    if (e.key === "Escape") {
+      e.preventDefault();
       e.stopPropagation();
-      if (controlsLegendDialog.style.display === "flex") {
-        closeControlsLegend();
-      } else {
-        openControlsLegend();
-      }
-    });
+      closeControlsLegend();
+      return;
+    }
 
-    controlsLegendDialog.addEventListener("click", (e) => {
-      if (e.target === controlsLegendDialog) {
-        closeControlsLegend();
+    const code = e.code;
+    const keycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="${code}"]`);
+    if (keycap) {
+      if (!keycap.classList.contains("pressed")) {
+        keycap.classList.add("pressed");
+        playKeycapAudio();
       }
-    });
-
-    // Global 'K' shortcut toggle when modal is active
-    window.addEventListener("keydown", (e) => {
-      if ((e.key === "k" || e.key === "K") && gameModal && gameModal.classList.contains("active")) {
-        const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
-        if (tag !== "input" && tag !== "textarea") {
-          e.preventDefault();
-          if (controlsLegendDialog && controlsLegendDialog.style.display === "flex") {
-            closeControlsLegend();
-          } else if (controlsLegendBtn) {
-            controlsLegendBtn.click();
-          }
-        }
+    } else if (code === "ShiftRight") {
+      const shiftKeycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="ShiftLeft"]`);
+      if (shiftKeycap && !shiftKeycap.classList.contains("pressed")) {
+        shiftKeycap.classList.add("pressed");
+        playKeycapAudio();
       }
-    });
-  }
-
-  // Universal Virtual Touch Controller Loader (#517)
-  if (typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches))) {
-    if (!document.querySelector('script[src*="virtual-controller.js"]')) {
-      const vcScript = document.createElement('script');
-      vcScript.src = 'assets/js/virtual-controller.js';
-      document.body.appendChild(vcScript);
     }
   }
+
+  function handleKeyTesterUp(e) {
+    if (!controlsLegendDialog || controlsLegendDialog.style.display !== "flex") return;
+    const code = e.code;
+    const keycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="${code}"]`);
+    if (keycap) {
+      keycap.classList.remove("pressed");
+    } else if (code === "ShiftRight") {
+      const shiftKeycap = controlsLegendDialog.querySelector(`.legend-keycap[data-code="ShiftLeft"]`);
+      if (shiftKeycap) shiftKeycap.classList.remove("pressed");
+    }
+  }
+
+  window.addEventListener("keydown", handleKeyTesterDown);
+  window.addEventListener("keyup", handleKeyTesterUp);
+
+  closeControlsLegend = function () {
+    if (!controlsLegendDialog) return;
+    controlsLegendDialog.style.display = "none";
+    if (controlsLegendBtn) {
+      controlsLegendBtn.classList.remove("active");
+      controlsLegendBtn.setAttribute("aria-expanded", "false");
+      try {
+        controlsLegendBtn.focus();
+      } catch (_) { }
+    }
+    const pressed = controlsLegendDialog.querySelectorAll(".legend-keycap.pressed");
+    pressed.forEach((p) => p.classList.remove("pressed"));
+  };
+
+  function openControlsLegend() {
+    if (!controlsLegendDialog) return;
+    updateControlsContent();
+    controlsLegendDialog.style.display = "flex";
+    if (controlsLegendBtn) {
+      controlsLegendBtn.classList.add("active");
+      controlsLegendBtn.setAttribute("aria-expanded", "true");
+    }
+    const closeBtn = controlsLegendDialog.querySelector("#close-controls-legend-btn");
+    if (closeBtn) {
+      setTimeout(() => closeBtn.focus(), 50);
+    }
+  }
+
+  controlsLegendBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (controlsLegendDialog.style.display === "flex") {
+      closeControlsLegend();
+    } else {
+      openControlsLegend();
+    }
+  });
+
+  controlsLegendDialog.addEventListener("click", (e) => {
+    if (e.target === controlsLegendDialog) {
+      closeControlsLegend();
+    }
+  });
+
+  // Global 'K' shortcut toggle when modal is active
+  window.addEventListener("keydown", (e) => {
+    if ((e.key === "k" || e.key === "K") && gameModal && gameModal.classList.contains("active")) {
+      const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+      if (tag !== "input" && tag !== "textarea") {
+        e.preventDefault();
+        if (controlsLegendDialog && controlsLegendDialog.style.display === "flex") {
+          closeControlsLegend();
+        } else if (controlsLegendBtn) {
+          controlsLegendBtn.click();
+        }
+      }
+    }
+  });
+}
+
+// Universal Virtual Touch Controller Loader (#517)
+if (typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches))) {
+  if (!document.querySelector('script[src*="virtual-controller.js"]')) {
+    const vcScript = document.createElement('script');
+    vcScript.src = 'assets/js/virtual-controller.js';
+    document.body.appendChild(vcScript);
+  }
+}
